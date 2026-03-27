@@ -191,7 +191,7 @@ class ARSystem(L.LightningModule):
                     matrix_local=None,
                     path=None,
                     cls=None,
-                )
+                ).add_breast_bones()
                 raw_data.export_fbx(path=path+".fbx")
     
     def on_validation_epoch_end(self):
@@ -339,7 +339,7 @@ class ARWriter(BasePredictionWriter):
                 matrix_local=None,
                 path=None,
                 cls=detokenize_output.cls,
-            )
+            ).add_breast_bones()
             if not self.user_mode and self.export_npz is not None:
                 print(make_path(self.export_npz, 'npz'))
                 raw_data.save(path=make_path(self.export_npz, 'npz'))

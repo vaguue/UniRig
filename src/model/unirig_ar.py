@@ -12,9 +12,10 @@ from ..tokenizer.spec import TokenizerSpec, DetokenizeOutput
 from copy import deepcopy
 
 class VocabSwitchingLogitsProcessor(LogitsProcessor):
-    def __init__(self, tokenizer: TokenizerSpec, start_tokens: LongTensor):
+    def __init__(self, tokenizer: TokenizerSpec, start_tokens: LongTensor, force_parts: List[str]=None):
         self.tokenizer = tokenizer
         self.start_tokens = start_tokens
+        self.force_parts = force_parts or []
         assert start_tokens.ndim == 1
 
     def __call__(self, input_ids: LongTensor, scores: FloatTensor) -> FloatTensor:
@@ -22,7 +23,17 @@ class VocabSwitchingLogitsProcessor(LogitsProcessor):
         for batch_idx, sequence in enumerate(input_ids):
             mask = torch.full_like(scores[batch_idx], float('-inf'))
             sequence = torch.cat([self.start_tokens, sequence])
-            tokens = self.tokenizer.next_posible_token(ids=sequence.detach().cpu().numpy())
+            seq_np = sequence.detach().cpu().numpy()
+            tokens = self.tokenizer.next_posible_token(ids=seq_np)
+            
+            # Remove eos if we haven't seen all forced parts
+            if self.tokenizer.eos in tokens:
+                for part in self.force_parts:
+                    part_token = self.tokenizer.part_name_to_token(part)
+                    if part_token not in seq_np:
+                        tokens.remove(self.tokenizer.eos)
+                        break
+            
             mask[tokens] = 0
             scores[batch_idx] = scores[batch_idx] + mask
         return scores
@@ -149,9 +160,11 @@ class UniRigAR(ModelSpec):
         ).to(dtype=self.transformer.dtype)
         cond = torch.cat([cond, start_embed], dim=1)
         
+        force_parts = kwargs.pop('force_parts', None)
         processor = VocabSwitchingLogitsProcessor(
             tokenizer=self.tokenizer,
             start_tokens=start_tokens,
+            force_parts=force_parts,
         )
         results = self.transformer.generate(
             inputs_embeds=cond,
