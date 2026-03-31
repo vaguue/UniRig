@@ -7,7 +7,10 @@ from typing import Dict, List
 from transformers import AutoModelForCausalLM, AutoConfig
 import math
 import torch_scatter
-from flash_attn.modules.mha import MHA
+try:
+    from flash_attn.modules.mha import MHA
+except ImportError:
+    from src.model.mha_fallback import MHA
 
 from .spec import ModelSpec, ModelInput
 from .parse_encoder import MAP_MESH_ENCODER, get_mesh_encoder
